@@ -1,0 +1,232 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(lme4)
+library(ggplot2)
+library(ggpubr)
+library(lmerTest)
+library(dplyr)
+library(magrittr)
+library(car)
+
+require(GGally)
+require(reshape2)
+require(lme4)
+require(compiler)
+require(parallel)
+#require(boot)
+library(tidyverse)
+library(MuMIn)
+require(optimx)
+
+require(lattice)
+
+library(chron)
+library(simr)
+library(broom)
+```
+
+Create output files
+```{r}
+path_to_data = "/Users/margieruffin/Desktop/Research/New Disinfo/Results/Data Collection 3/Fixed LMER/"
+
+response_file = "Q1_Q2_GeneralModel.csv"
+
+output_results = file.path(path_to_data, response_file)
+print(output_results)
+
+setwd(path_to_data)
+
+#Read in data
+all_reponses <- read.csv(output_results)
+all_reponses <- na.omit(all_reponses)
+
+print(all_reponses)
+summary(all_reponses)
+
+```
+
+Clean up the data
+```{r}
+#use this section to clean up the data
+
+ clean_data <- function(data) {
+   data <- na.omit(data)
+   head(data)
+    
+    data %<>%
+     mutate(Acc = as.double(Accuracy),
+            Acc = if_else(Accuracy == "Very Inaccurate (1)", -2, Acc),
+            Acc = if_else(Accuracy == "Somewhat Inaccurate (2)", -1, Acc),
+            Acc = if_else(Accuracy == "Neither Accurate nor Inaccurate (3)", 0, Acc),
+            Acc = if_else(Accuracy == "Somewhat Accurate (4)", 1, Acc),
+            Acc = if_else(Accuracy == "Very Accurate (5)", 2, Acc))
+    data$Accuracy <- factor(data$Accuracy)
+    
+    #--------------------------------------------------------------------------------------------------
+    
+   #Mutate All Engagements
+    data %<>%
+     mutate(Eng = as.numeric(Engagement),
+            Eng = if_else(Engagement == "Like", 1, Eng),
+            Eng = if_else(Engagement == "Retweet", 1, Eng),
+            Eng = if_else(Engagement == "Reply",1, Eng),
+            Eng = if_else(Engagement == "External Share", 1, Eng),
+            Eng = if_else(Engagement == "No Engagement", 0, Eng),
+            Eng = if_else(Engagement == "Prefer not to say", 0, Eng))
+    data$Engagement <- factor(data$Engagement)
+    
+    #--------------------------------------------------------------------------------------------------
+    # 
+    #  data %<>%
+    #   mutate(photoshop = as.character(Photoshop),
+    #          photoshop = if_else(Photoshop == "Yes, very experienced", "yes experience", photoshop),
+    #          photoshop = if_else(Photoshop == "Yes, somewhat experienced", "yes experience", photoshop),
+    #          photoshop = if_else(Photoshop == "Yes, but I just started using it", "yes experience", photoshop),
+    #          photoshop = if_else(Photoshop == "No, I've never used it", "no experience", photoshop),
+    #          photoshop = if_else(Photoshop == "Prefer not to say", "no experience", photoshop))
+    # data$Photoshop <- factor(data$Photoshop)
+    # 
+    # data %<>%
+    #   mutate(political = as.character(Political_View),
+    #          political = if_else(Political_View == "Very Liberal", "liberal", political),
+    #          political = if_else(Political_View == "Slightly Liberal", "liberal", political),
+    #          political = if_else(Political_View == "Slightly Conservative", "conservative", political),
+    #          political = if_else(Political_View == "Very Conservative", "conservative", political),
+    #          political = if_else(Political_View == "Prefer not to say", "conservative", political))
+    # data$Political_View <- factor(data$Political_View)
+    # 
+    # data %<>%
+    #   mutate(trust = as.character(Trust_Tweet),
+    #          trust = if_else(Trust_Tweet == "Untrustworthy 1", "not trusting", trust),
+    #          trust = if_else(Trust_Tweet == "2", "not trusting", trust),
+    #          trust = if_else(Trust_Tweet == "3", "not trusting", trust),
+    #          trust = if_else(Trust_Tweet == "4", "not trusting", trust),
+    #          trust = if_else(Trust_Tweet == "Neutral 5", "neutral", trust),
+    #          trust = if_else(Trust_Tweet == "6", "trusting", trust), 
+    #          trust = if_else(Trust_Tweet == "7", "trusting", trust), 
+    #          trust = if_else(Trust_Tweet == "8", "trusting", trust), 
+    #          trust = if_else(Trust_Tweet == "9", "trusting", trust), 
+    #          trust = if_else(Trust_Tweet == "Trustworthy 10", "trusting", trust))
+    # data$Trust_Tweet <- factor(data$Trust_Tweet)
+    # 
+    
+    # data$photoshop <- factor(data$photoshop)
+    # data$trust <- factor(data$trust)
+    # data$political <- factor(data$political)
+  
+
+   data$Eng <-factor(data$Eng)
+   data$TweetID <- factor(data$TweetID)
+   data$Condition <- factor(data$Condition)
+   data$SubjectID <- factor(data$SubjectID)
+
+   
+   
+  # data$Age <- factor(data$Age)
+  # data$TweetEngage <- factor(data$TweetEngage)
+  # data$TPEngage <- factor(data$TPEngage)
+  # data$Political_View <- factor(data$Political_View)
+  # data$Trust_Tweet <- factor(data$Trust_Tweet)
+  # data$TweetID <- factor(data$TweetID)
+   #Mutate Age??
+   # data %<>%
+   #   mutate(Age.0 = as.numeric(Age),
+   #          Age.0 = if_else(Age == 'Under 18', 0, Age.0),
+   #          Age.0 = if_else(Age == '18-24', 1, Age.0),
+   #          Age.0 = if_else(Age == '25-34', 2, Age.0),
+   #          Age.0 = if_else(Age == '35-44', 3, Age.0),
+   #          Age.0 = if_else(Age == '45-54', 4, Age.0),
+   #          Age.0 = if_else(Age == '55-64', 5, Age.0),
+   #          Age.0 = if_else(Age == '65+', 6, Age.0))
+           
+   #data$Age.0 <- factor(data$Age.0)
+   
+   #Mutate Gender??
+   # data %<>%
+   #   mutate(Gender.0 = as.character(Gender),
+   #          Gender.0 = if_else(Gender == 'Male', '0Male', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Female', '1Female', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Other', '2Other', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Prefer not to say', '2Other', Gender.0),
+   #          Gender.0 = if_else(Gender == '', '2Other', Gender.0))
+   #data$Gender <- factor(data$Gender)
+    
+   #Mutate Education
+   #data$Education <- factor(data$Education)
+
+ return(data)
+ }
+ 
+ CleanRespones <- clean_data(all_reponses)
+
+ print(CleanRespones)
+ 
+
+```
+```{r}
+data = CleanRespones
+
+response.model = lmer(Timing ~ Condition * HasProfile + (1 | SubjectID), data, REML = FALSE) # + (1|TweetID)
+
+summary(response.model)
+anova(response.model)
+#allFit(response.model)
+
+```
+```{r}
+data = CleanRespones
+CleanRespones <- within(CleanRespones, Condition <- relevel(Condition, ref = "2"))
+response.model = lmer(FPTiming ~ Condition + (1 | SubjectID) , data, REML = FALSE) # + (1|TweetID)
+
+summary(response.model)
+anova(response.model)
+#allFit(response.model)
+```
+
+
+General Model for Q1
+```{r}
+data = CleanRespones
+
+response.model = lmer(Acc ~ Condition * HasProfile + (1 | SubjectID) + (1|TweetID), data, REML = FALSE)
+
+#summary(response.model)
+anova(response.model)
+```
+
+```{r}
+data = CleanRespones
+
+#response.model = glmer(Eng ~ Condition * HasProfile + (1 | SubjectID), data, family=binomial) #+ (1 | TweetID)
+
+response.model = glmer(Eng ~ Condition * HasProfile + (1 | SubjectID) , data, family=binomial) #+ (1 | TweetID)
+
+#summary(response.model)
+Anova(response.model)
+#allFit(response.model)
+#anova(response.model, test="Chisq")
+```
+
+
+General Model for Q2
+# ```{r}
+# data = CleanRespones
+# 
+# response.model = glmer(Eng ~ Condition * HasProfile + (1 | SubjectID) + (1 | TweetID), data, family=binomial)
+# 
+# #summary(response.model)
+# #anova(response.model)
+# 
+# ```
+# ```{r}
+# data = CleanRespones
+# write.table(data, file = "data.csv",
+#             sep = "\t", row.names = F)
+```
+
+

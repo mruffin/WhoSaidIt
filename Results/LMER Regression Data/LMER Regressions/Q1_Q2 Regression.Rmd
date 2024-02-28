@@ -1,0 +1,704 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+#library(lme4)
+library(ggplot2)
+library(ggpubr)
+library(lmerTest)
+library(dplyr)
+library(magrittr)
+library(car)
+library("stringr") 
+
+require(GGally)
+require(reshape2)
+require(lme4)
+require(compiler)
+require(parallel)
+#require(boot)
+library(tidyverse)
+library(MuMIn)
+
+require(lattice)
+
+library(chron)
+library(simr)
+library(broom)
+```
+
+Create output files
+```{r}
+path_to_data = "/Users/margieruffin/Desktop/Research/New Disinfo/Results/Data Collection 3/Fixed LMER/"
+
+response_file = "Q1Responses.csv"
+
+output_results = file.path(path_to_data, response_file)
+print(output_results)
+
+setwd(path_to_data)
+
+#Read in data
+all_reponses <- read.csv(output_results)
+all_reponses <- na.omit(all_reponses)
+
+print(all_reponses)
+summary(all_reponses)
+
+```
+
+Clean up the data
+```{r}
+#use this section to clean up the data
+
+ clean_data <- function(data) {
+   data <- na.omit(data)
+   head(data)
+   
+
+    data %<>%
+     mutate(C1Acc = as.double(Cond1Acc),
+            C1Acc = if_else(Cond1Acc == "Very Inaccurate (1)", -2, C1Acc),
+            C1Acc = if_else(Cond1Acc == "Somewhat Inaccurate (2)", -1, C1Acc),
+            C1Acc = if_else(Cond1Acc == "Neither Accurate nor Inaccurate (3)", 0, C1Acc),
+            C1Acc = if_else(Cond1Acc == "Somewhat Accurate (4)", 1, C1Acc),
+            C1Acc = if_else(Cond1Acc == "Very Accurate (5)", 2, C1Acc))
+    data$Cond1Acc <- factor(data$Cond1Acc)
+
+    data %<>%
+     mutate(C2Acc = as.double(Cond2Acc),
+            C2Acc = if_else(Cond2Acc == "Very Inaccurate (1)", -2, C2Acc),
+            C2Acc = if_else(Cond2Acc == "Somewhat Inaccurate (2)", -1, C2Acc),
+            C2Acc = if_else(Cond2Acc == "Neither Accurate nor Inaccurate (3)", 0, C2Acc),
+            C2Acc = if_else(Cond2Acc == "Somewhat Accurate (4)", 1, C2Acc),
+            C2Acc = if_else(Cond2Acc == "Very Accurate (5)", 2, C2Acc))
+    data$Cond2Acc <- factor(data$Cond2Acc)
+
+    data %<>%
+     mutate(C3Acc = as.double(Cond3Acc),
+            C3Acc = if_else(Cond3Acc == "Very Inaccurate (1)", -2, C3Acc),
+            C3Acc = if_else(Cond3Acc == "Somewhat Inaccurate (2)", -1, C3Acc),
+            C3Acc = if_else(Cond3Acc == "Neither Accurate nor Inaccurate (3)", 0, C3Acc),
+            C3Acc = if_else(Cond3Acc == "Somewhat Accurate (4)", 1, C3Acc),
+            C3Acc = if_else(Cond3Acc == "Very Accurate (5)", 2, C3Acc))
+    data$Cond3Acc <- factor(data$Cond3Acc)
+    
+  #----------------------------For Tables----------------------------------------------------------------------
+  data %<>%
+     mutate(Con1 = as.double(Cond1Acc),
+            Con1 = if_else(Cond1Acc == "Very Inaccurate (1)", 1, Con1),
+            Con1 = if_else(Cond1Acc == "Somewhat Inaccurate (2)", 2, Con1),
+            Con1 = if_else(Cond1Acc == "Neither Accurate nor Inaccurate (3)", 3, Con1),
+            Con1 = if_else(Cond1Acc == "Somewhat Accurate (4)", 4, Con1),
+            Con1 = if_else(Cond1Acc == "Very Accurate (5)", 5, Con1))
+    data$Cond1Acc <- factor(data$Cond1Acc)
+
+    data %<>%
+     mutate(Con2 = as.double(Cond2Acc),
+            Con2 = if_else(Cond2Acc == "Very Inaccurate (1)", 1, Con2),
+            Con2 = if_else(Cond2Acc == "Somewhat Inaccurate (2)", 2, Con2),
+            Con2 = if_else(Cond2Acc == "Neither Accurate nor Inaccurate (3)", 3, Con2),
+            Con2 = if_else(Cond2Acc == "Somewhat Accurate (4)", 4, Con2),
+            Con2 = if_else(Cond2Acc == "Very Accurate (5)", 5, Con2))
+    data$Cond2Acc <- factor(data$Cond2Acc)
+
+    data %<>%
+     mutate(Con3 = as.double(Cond3Acc),
+            Con3 = if_else(Cond3Acc == "Very Inaccurate (1)", 1, Con3),
+            Con3 = if_else(Cond3Acc == "Somewhat Inaccurate (2)", 2, Con3),
+            Con3 = if_else(Cond3Acc == "Neither Accurate nor Inaccurate (3)", 3, Con3),
+            Con3 = if_else(Cond3Acc == "Somewhat Accurate (4)", 4, Con3),
+            Con3 = if_else(Cond3Acc == "Very Accurate (5)", 5, Con3))
+    data$Cond3Acc <- factor(data$Cond3Acc)
+    
+    
+    
+    
+    #--------------------------------------------------------------------------------------------------
+    
+   #Mutate All Engagements
+   data %<>%
+     mutate(C1Eng = as.numeric(Cond1Eng),
+            C1Eng = if_else(Cond1Eng == "Like", 1, C1Eng),
+            C1Eng = if_else(Cond1Eng == "Retweet", 1, C1Eng),
+            C1Eng = if_else(Cond1Eng == "Reply", 1, C1Eng),
+            C1Eng = if_else(Cond1Eng == "External Share", 1, C1Eng),
+            C1Eng = if_else(Cond1Eng == "No Engagement", 0, C1Eng),
+            C1Eng = if_else(Cond1Eng == "Prefer not to say", 0, C1Eng))
+    data$Cond1Eng <- factor(data$Cond1Eng)
+
+  data %<>%
+     mutate(C2Eng = as.numeric(Cond2Eng),
+            C2Eng = if_else(Cond2Eng == "Like", 1, C2Eng),
+            C2Eng = if_else(Cond2Eng == "Retweet", 1, C2Eng),
+            C2Eng = if_else(Cond2Eng == "Reply", 1, C2Eng),
+            C2Eng = if_else(Cond2Eng == "External Share", 1, C2Eng),
+            C2Eng = if_else(Cond2Eng == "No Engagement", 0, C2Eng),
+            C2Eng = if_else(Cond2Eng == "Prefer not to say", 0, C2Eng))
+    data$Cond2Eng <- factor(data$Cond2Eng)
+
+  data %<>%
+     mutate(C3Eng = as.numeric(Cond3Eng),
+            C3Eng = if_else(Cond3Eng == "Like", 1, C3Eng),
+            C3Eng = if_else(Cond3Eng == "Retweet", 1, C3Eng),
+            C3Eng = if_else(Cond3Eng == "Reply",1, C3Eng),
+            C3Eng = if_else(Cond3Eng == "External Share", 1, C3Eng),
+            C3Eng = if_else(Cond3Eng == "No Engagement", 0, C3Eng),
+            C3Eng = if_else(Cond3Eng == "Prefer not to say", 0, C3Eng))
+    data$Cond3Eng <- factor(data$Cond3Eng)
+    
+    
+    #--------------------------------------------------------------------------------------------------
+    #Mutate All Fake Profile Ratings
+    data %<>%
+      mutate(C1Fake = as.double(Cond1Fake),
+             C1Fake = if_else(Cond1Fake == "Definitely fake (1)", -2, C1Fake),
+             C1Fake = if_else(Cond1Fake == "More fake than real (2)", -1, C1Fake),
+             C1Fake = if_else(Cond1Fake == "I'm not sure (3)", 0, C1Fake),
+             C1Fake = if_else(Cond1Fake == "More real than fake (4)",1, C1Fake),
+             C1Fake = if_else(Cond1Fake == "Definitely real (5)", 2, C1Fake))
+    data$Cond1Fake <- factor(data$Cond1Fake)
+
+    data %<>%
+      mutate(C2Fake = as.double(Cond2Fake),
+             C2Fake = if_else(Cond2Fake == "Definitely fake (1)", -2, C2Fake),
+             C2Fake = if_else(Cond2Fake == "More fake than real (2)", -1, C2Fake),
+             C2Fake = if_else(Cond2Fake == "I'm not sure (3)", 0, C2Fake),
+             C2Fake = if_else(Cond2Fake == "More real than fake (4)",1, C2Fake),
+             C2Fake = if_else(Cond2Fake == "Definitely real (5)", 2, C2Fake))
+    data$Cond2Fake <- factor(data$Cond2Fake)
+
+    data %<>%
+      mutate(C3Fake = as.double(Cond3Fake),
+             C3Fake = if_else(Cond3Fake == "Definitely fake (1)", -2, C3Fake),
+             C3Fake = if_else(Cond3Fake == "More fake than real (2)", -1, C3Fake),
+             C3Fake = if_else(Cond3Fake == "I'm not sure (3)", 0, C3Fake),
+             C3Fake = if_else(Cond3Fake == "More real than fake (4)",1, C3Fake),
+             C3Fake = if_else(Cond3Fake == "Definitely real (5)", 2, C3Fake))
+    data$Cond3Fake <- factor(data$Cond3Fake)
+    
+    #---------------------For Tables-----------------------------------------------------------------------------
+
+    data %<>%
+      mutate(C1F = as.double(Cond1Fake),
+             C1F = if_else(Cond1Fake == "Definitely fake (1)", 1, C1F),
+             C1F = if_else(Cond1Fake == "More fake than real (2)", 2, C1F),
+             C1F = if_else(Cond1Fake == "I'm not sure (3)", 3, C1F),
+             C1F = if_else(Cond1Fake == "More real than fake (4)",4, C1F),
+             C1F = if_else(Cond1Fake == "Definitely real (5)", 5, C1F),
+             C1F = if_else(Cond1Fake == "", 0, C1F))
+    data$Cond1Fake <- factor(data$Cond1Fake)
+
+    data %<>%
+      mutate(C2F = as.double(Cond2Fake),
+             C2F = if_else(Cond2Fake == "Definitely fake (1)", 1, C2F),
+             C2F = if_else(Cond2Fake == "More fake than real (2)", 2, C2F),
+             C2F = if_else(Cond2Fake == "I'm not sure (3)", 3, C2F),
+             C2F = if_else(Cond2Fake == "More real than fake (4)",4, C2F),
+             C2F = if_else(Cond2Fake == "Definitely real (5)", 5, C2F),
+             C2F = if_else(Cond1Fake == "", 0, C2F))
+    data$Cond2Fake <- factor(data$Cond2Fake)
+
+    data %<>%
+      mutate(C3F = as.double(Cond3Fake),
+             C3F = if_else(Cond3Fake == "Definitely fake (1)", 1, C3F),
+             C3F = if_else(Cond3Fake == "More fake than real (2)", 2, C3F),
+             C3F = if_else(Cond3Fake == "I'm not sure (3)", 3, C3F),
+             C3F = if_else(Cond3Fake == "More real than fake (4)",4, C3F),
+             C3F = if_else(Cond3Fake == "Definitely real (5)", 5, C3F),
+             C3F = if_else(Cond1Fake == "", 0, C3F))
+    data$Cond3Fake <- factor(data$Cond3Fake)
+
+
+   data$C1Eng <-factor(data$C1Eng)
+   data$C2Eng <-factor(data$C2Eng)
+   data$C3Eng <-factor(data$C3Eng)
+   
+   data$Con1Tweet <-factor(data$Con1Tweet)
+   data$Con2Tweet <-factor(data$Con2Tweet)
+   data$Con3Tweet <-factor(data$Con3Tweet)
+   
+   
+  # data$Age <- factor(data$Age)
+  # data$TweetEngage <- factor(data$TweetEngage)
+  # data$TPEngage <- factor(data$TPEngage)
+  # data$Political_View <- factor(data$Political_View)
+  # data$Trust_Tweet <- factor(data$Trust_Tweet)
+  # data$TweetID <- factor(data$TweetID)
+   #Mutate Age??
+   # data %<>%
+   #   mutate(Age.0 = as.numeric(Age),
+   #          Age.0 = if_else(Age == 'Under 18', 0, Age.0),
+   #          Age.0 = if_else(Age == '18-24', 1, Age.0),
+   #          Age.0 = if_else(Age == '25-34', 2, Age.0),
+   #          Age.0 = if_else(Age == '35-44', 3, Age.0),
+   #          Age.0 = if_else(Age == '45-54', 4, Age.0),
+   #          Age.0 = if_else(Age == '55-64', 5, Age.0),
+   #          Age.0 = if_else(Age == '65+', 6, Age.0))
+           
+   #data$Age.0 <- factor(data$Age.0)
+   
+   #Mutate Gender??
+   # data %<>%
+   #   mutate(Gender.0 = as.character(Gender),
+   #          Gender.0 = if_else(Gender == 'Male', '0Male', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Female', '1Female', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Other', '2Other', Gender.0),
+   #          Gender.0 = if_else(Gender == 'Prefer not to say', '2Other', Gender.0),
+   #          Gender.0 = if_else(Gender == '', '2Other', Gender.0))
+   #data$Gender <- factor(data$Gender)
+    
+   #Mutate Education
+   #data$Education <- factor(data$Education)
+
+ return(data)
+ }
+ 
+ CleanRespones <- clean_data(all_reponses)
+
+ print(CleanRespones)
+ 
+ # print (CleanRespones[CleanRespones$Condition == "1", ])
+
+```
+
+Q1: Condition 1
+```{r}
+data = CleanRespones
+
+response.model = lmer(C1Acc ~ HasProfile + (1|Con1Subject) + (1|Con1Tweet)  ,data , REML = FALSE)
+ 
+summary(response.model)
+```
+
+Q1: Condition 2
+```{r}
+data = CleanRespones
+
+response.model = lmer(C2Acc ~ HasProfile + (1|Con2Subject) + (1|Con2Tweet)  ,data , REML = FALSE)
+ 
+summary(response.model)
+```
+
+Q1: Condition 3
+```{r}
+data = CleanRespones
+
+response.model = lmer(C3Acc ~ HasProfile + (1|Con3Subject) + (1|Con3Tweet)  ,data , REML = FALSE)
+ 
+summary(response.model)
+```
+
+Q2: Condition 1
+```{r}
+data = CleanRespones
+
+response.model = glmer(C1Eng ~ HasProfile + (1|Con1Subject) , family=binomial, data) #+ (1|Con1Tweet)
+
+summary(response.model)
+```
+
+Q2: Condition 2
+```{r}
+data = CleanRespones
+
+response.model = glmer(C2Eng  ~ HasProfile + (1|Con2Subject) , family=binomial, data) #+ (1|Con2Tweet)
+
+summary(response.model)
+```
+
+
+Q2: Condition 3
+```{r}
+data = CleanRespones
+
+response.model = glmer(C3Eng  ~ HasProfile + (1|Con3Subject), family=binomial ,data) #+(1|Con3Tweet) 
+
+summary(response.model)
+```
+
+
+
+```{r}
+
+#numeric value === y 
+#categorical = condition 1, 2, 3 == x 
+#subgroup = w/ profile, w/o profile == fill
+
+condition1 <-aggregate(CleanRespones$Con1, list(CleanRespones$HasProfile), FUN=mean)
+condition2 <-aggregate(CleanRespones$Con2, list(CleanRespones$HasProfile), FUN=mean)
+condition3 <-aggregate(CleanRespones$Con3, list(CleanRespones$HasProfile), FUN=mean)
+
+#noPro <- c(condition1[1,2], condition2[1,2], condition3[1,2])
+#hasPro <- c(condition1[2,2], condition2[2,2], condition3[2,2])
+
+condition1SD <-aggregate(CleanRespones$Con1, list(CleanRespones$HasProfile), FUN=sd)
+condition2SD <-aggregate(CleanRespones$Con2, list(CleanRespones$HasProfile), FUN=sd)
+condition3SD <-aggregate(CleanRespones$Con3, list(CleanRespones$HasProfile), FUN=sd)
+
+C1N <-condition1SD[1,2]/sqrt(417)
+C2N <-condition2SD[1,2]/sqrt(417)
+C3N <-condition3SD[1,2]/sqrt(417)
+
+C1Y <-condition1SD[2,2]/sqrt(417)
+C2Y <-condition2SD[2,2]/sqrt(417)
+C3Y <-condition3SD[2,2]/sqrt(417)
+
+stders <-c(C1N, C2N, C3N, C1Y, C2Y, C3Y)
+
+data <- data.frame(
+  condition=rep(c("w/o Profile", "w/ Profile"),each=3),
+  names=rep(c("Organization", "Deepfake", "Simplefake"), 2),
+  profiles=c(condition1[1,2], condition2[1,2], condition3[1,2], condition1[2,2], condition2[2,2], condition3[2,2]),
+  #sd=c(condition1SD[1,2], condition2SD[1,2], condition3SD[1,2], condition1SD[2,2], condition2SD[2,2], condition3SD[2,2])
+  sd = stders
+)
+
+data$names <- factor(data$names,
+    levels = c("Organization", "Deepfake", "Simplefake"),ordered = TRUE)
+
+data$condition <- factor(data$condition,
+    levels = c("w/o Profile", "w/ Profile"),ordered = TRUE)
+
+plot <- ggplot(data, aes(x=names, y=profiles, fill=condition)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_manual(values=c("sienna1",
+                             "darkturquoise")) +
+  geom_errorbar( aes(x=names, ymin=profiles-sd, ymax=profiles+sd), width=0.2, colour="black", position=position_dodge(.9), alpha=0.9, size=1)
+
+plot + theme(
+    legend.position = c(1, 1),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    #top, right, bottom, left
+    legend.margin = margin(10, 10, 10, 10),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    legend.text = element_text(size=15)
+    
+    ) + ggtitle("") + xlab("") + ylab("Tweet Accuracy") + coord_cartesian(ylim=c(1,5))
+  
+  #expand_limits(y=c(1,5))
+
+
+```
+
+```{r}
+
+#numeric value === y 
+#categorical = condition 1, 2, 3 == x 
+#subgroup = w/ profile, w/o profile == fill
+
+stderr <- function(x) sd(x) / sqrt(length(x))
+
+F1 <-mean(CleanRespones$C1Fake, na.rm = TRUE)
+F2 <-mean(CleanRespones$C2Fake, na.rm = TRUE)
+F3 <-mean(CleanRespones$C3Fake, na.rm = TRUE)
+
+F1 <- F1+3
+F2 <- F2+3
+F3 <- F3+3
+
+means <-c(F1, F2, F3)
+
+F1SD <-sd(CleanRespones$C1Fake, na.rm = TRUE)
+F2SD <-sd(CleanRespones$C2Fake, na.rm = TRUE)
+F3SD <-sd(CleanRespones$C3Fake, na.rm = TRUE)
+
+# stdevs <-c(F1SD, F2SD, F3SD)
+# stdevs
+
+F1SE <- F1SD/sqrt(417)
+F2SE <- F2SD/sqrt(417)
+F3SE <- F3SD/sqrt(417)
+
+stderrs <-c(F1SE, F2SE, F3SE)
+stderrs
+
+data2 <- data.frame(
+  names=c("Organization", "Deepfake", "Simplefake"),
+  profiles=means,
+  sd=stderrs
+)
+
+data2$names <- factor(data2$names,
+    levels = c("Organization", "Deepfake", "Simplefake"),ordered = TRUE)
+
+plot <- ggplot(data2, aes(x=names, y=profiles, fill=names)) +
+  geom_bar(stat="identity") + scale_fill_manual(values=c("springgreen3","springgreen3", "springgreen3" )) +
+  geom_errorbar( aes(x=, ymin=profiles-sd, ymax=profiles+sd), width=0.2, colour="black", position=position_dodge(.9), alpha=0.9, size=1)
+
+plot + theme(
+     legend.position = "none",
+    # legend.justification = c("right", "top"),
+    # legend.box.just = "right",
+    # #top, right, bottom, left
+    # legend.margin = margin(10, 10, 10, 10),
+    # legend.title = element_blank(),
+    # legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    #legend.text = element_text(size=12)
+
+    ) + ggtitle("") + xlab("") + ylab("Profile Authenticity") + coord_cartesian(ylim=c(1,5))
+
+```
+```{r}
+#numeric value === y 
+#categorical = condition 1, 2, 3 == x 
+#subgroup = w/ profile, w/o profile == fill
+
+#No Profiles
+C1noE <- (sum(CleanRespones$C1Eng == 0 & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+C2noE <- (sum(CleanRespones$C2Eng == 0 & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+C3noE <- (sum(CleanRespones$C3Eng == 0 & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+#Yes Profiles
+C1noEP <- (sum(CleanRespones$C1Eng == 0 & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+C2noEP <- (sum(CleanRespones$C2Eng == 0 & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+C3noEP <- (sum(CleanRespones$C3Eng == 0 & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+
+percents <- c(C1noE, C2noE, C3noE, C1noEP,C2noEP, C3noEP)
+
+data <- data.frame(
+  condition=rep(c("w/o Profile", "w/ Profile"),each=3),
+  names=rep(c("Organization", "Deepfake", "Simplefake"), 2),
+  profiles=percents
+)
+
+data$names <- factor(data$names,
+    levels = c("Organization", "Deepfake", "Simplefake"),ordered = TRUE)
+
+data$condition <- factor(data$condition,
+    levels = c("w/o Profile", "w/ Profile"),ordered = TRUE)
+
+plot <- ggplot(data, aes(x=names, y=profiles, fill=condition)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_manual(values=c("sienna1",
+                             "darkturquoise"))
+
+plot + theme(
+    legend.position = c(1, .95),
+    legend.justification = c("right"),
+    legend.box.just = "right",
+    #top, right, bottom, left
+    legend.margin = margin(10, 10, 10, 10),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    legend.text = element_text(size=15)
+    ) + ggtitle("") + xlab("") + ylab("% of No Engagement") + expand_limits(y=c(0,105))
+
+
+```
+```{r}
+#numeric value === y 
+#categorical = condition 1, 2, 3 == x 
+#subgroup = w/ profile, w/o profile == fill
+
+#No Profiles
+C1N1 <- (sum(CleanRespones$Cond1Eng == "Like" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C1N2 <- (sum(CleanRespones$Cond1Eng == "Retweet" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C1N3 <- (sum(CleanRespones$Cond1Eng == "Reply" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C1N4 <- (sum(CleanRespones$Cond1Eng == "External Share" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C1N5 <- (sum(CleanRespones$Cond1Eng == "No Engagement" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C1N6 <- (sum(CleanRespones$Cond1Eng == "Prefer not to say" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+
+#Yes Profiles
+C1Y1 <- (sum(CleanRespones$Cond1Eng == "Like" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C1Y2 <- (sum(CleanRespones$Cond1Eng == "Retweet" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C1Y3 <- (sum(CleanRespones$Cond1Eng == "Reply" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C1Y4 <- (sum(CleanRespones$Cond1Eng == "External Share" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C1Y5 <- (sum(CleanRespones$Cond1Eng == "No Engagement" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C1Y6 <- (sum(CleanRespones$Cond1Eng == "Prefer not to say" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+
+percents <- c(C1N1,C1N2,C1N3,C1N4,C1N5,C1N6,C1Y1, C1Y2, C1Y3,C1Y4, C1Y5,C1Y6)
+
+data <- data.frame(
+  condition=rep(c("w/o Profile", "w/ Profile"),each=6),
+  names=rep(c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"), 2),
+  profiles=percents
+)
+
+data$names <- factor(data$names,
+    levels = c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"),ordered = TRUE)
+
+data$condition <- factor(data$condition,
+    levels = c("w/o Profile", "w/ Profile"),ordered = TRUE)
+
+plot <- ggplot(data, aes(x=names, y=profiles, fill=condition)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_manual(values=c("sienna1",
+                             "darkturquoise"))
+
+plot + theme(
+    legend.position = c(.3, .89),
+    legend.justification = c("right"),
+    legend.box.just = "right",
+    #top, right, bottom, left
+    legend.margin = margin(10, 10, 10, 10),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    legend.text = element_text(size=15),
+
+    ) + ggtitle("") + xlab("") + ylab("% of Participants") + expand_limits(y=c(0,100))+ 
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 7))
+```
+```{r}
+#No Profiles
+C2N1 <- (sum(CleanRespones$Cond2Eng == "Like" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C2N2 <- (sum(CleanRespones$Cond2Eng == "Retweet" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C2N3 <- (sum(CleanRespones$Cond2Eng == "Reply" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C2N4 <- (sum(CleanRespones$Cond2Eng == "External Share" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C2N5 <- (sum(CleanRespones$Cond2Eng == "No Engagement" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C2N6 <- (sum(CleanRespones$Cond2Eng == "Prefer not to say" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+
+#Yes Profiles
+C2Y1 <- (sum(CleanRespones$Cond2Eng == "Like" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C2Y2 <- (sum(CleanRespones$Cond2Eng == "Retweet" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C2Y3 <- (sum(CleanRespones$Cond2Eng == "Reply" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C2Y4 <- (sum(CleanRespones$Cond2Eng == "External Share" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C2Y5 <- (sum(CleanRespones$Cond2Eng == "No Engagement" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C2Y6 <- (sum(CleanRespones$Cond2Eng == "Prefer not to say" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+
+percents <- c(C2N1,C2N2,C2N3,C2N4,C2N5,C2N6,C2Y1, C2Y2, C2Y3,C2Y4, C2Y5,C2Y6)
+
+data <- data.frame(
+  condition=rep(c("w/o Profile", "w/ Profile"),each=6),
+  names=rep(c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"), 2),
+  profiles=percents
+)
+
+data$names <- factor(data$names,
+    levels = c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"),ordered = TRUE)
+
+data$condition <- factor(data$condition,
+    levels = c("w/o Profile", "w/ Profile"),ordered = TRUE)
+
+plot <- ggplot(data, aes(x=names, y=profiles, fill=condition)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_manual(values=c("sienna1",
+                             "darkturquoise"))
+
+plot + theme(
+    legend.position = c(.3, .89),
+    legend.justification = c("right"),
+    legend.box.just = "right",
+    #top, right, bottom, left
+    legend.margin = margin(10, 10, 10, 10),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    legend.text = element_text(size=15),
+
+    ) + ggtitle("") + xlab("") + ylab("% of Participants") + expand_limits(y=c(0,100))+ 
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 7))
+```
+
+```{r}
+#No Profiles
+C3N1 <- (sum(CleanRespones$Cond3Eng == "Like" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C3N2 <- (sum(CleanRespones$Cond3Eng == "Retweet" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C3N3 <- (sum(CleanRespones$Cond3Eng == "Reply" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C3N4 <- (sum(CleanRespones$Cond3Eng == "External Share" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C3N5 <- (sum(CleanRespones$Cond3Eng == "No Engagement" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+C3N6 <- (sum(CleanRespones$Cond3Eng == "Prefer not to say" & CleanRespones$HasProfile == "No") / sum(CleanRespones$HasProfile == "No")) *100
+
+
+#Yes Profiles
+C3Y1 <- (sum(CleanRespones$Cond3Eng == "Like" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C3Y2 <- (sum(CleanRespones$Cond3Eng == "Retweet" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C3Y3 <- (sum(CleanRespones$Cond3Eng == "Reply" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C3Y4 <- (sum(CleanRespones$Cond3Eng == "External Share" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C3Y5 <- (sum(CleanRespones$Cond3Eng == "No Engagement" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+C3Y6 <- (sum(CleanRespones$Cond3Eng == "Prefer not to say" & CleanRespones$HasProfile == "Yes") / sum(CleanRespones$HasProfile == "Yes")) *100
+
+
+percents <- c(C3N1,C3N2,C3N3,C3N4,C3N5,C3N6,C3Y1, C3Y2, C3Y3,C3Y4, C3Y5,C3Y6)
+
+dataC3 <- data.frame(
+  condition=rep(c("w/o Profile", "w/ Profile"),each=6),
+  names=rep(c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"), 2),
+  profiles=percents
+)
+
+dataC3$names <- factor(dataC3$names,
+    levels = c("Like", "Retweet", "Reply", "Ext. Share", "No Eng.", "Prefer NTS"),ordered = TRUE)
+
+dataC3$condition <- factor(dataC3$condition,
+    levels = c("w/o Profile", "w/ Profile"),ordered = TRUE)
+
+plot <- ggplot(dataC3, aes(x=names, y=profiles, fill=condition)) +
+  geom_bar(stat="identity", position=position_dodge())+
+  scale_fill_manual(values=c("sienna1",
+                             "darkturquoise"))
+
+plot + theme(
+    legend.position = c(.3, .89),
+    legend.justification = c("right"),
+    legend.box.just = "right",
+    #top, right, bottom, left
+    legend.margin = margin(10, 10, 10, 10),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill="NA"),
+    axis.title.y = element_text(colour="black", size=20, face = "bold"),
+    axis.text.x = element_text(colour = "black", size=20, face = "bold"),
+    axis.text.y = element_text(colour = "black", size=15),
+    legend.text = element_text(size=15),
+
+    ) + ggtitle("") + xlab("") + ylab("% of Participants") + expand_limits(y=c(0,100))+ 
+    scale_x_discrete(labels = function(x) str_wrap(x, width = 7))
+
+```
+
+
+Q2: Condition 1
+# ```{r}
+# data = CleanRespones
+# 
+# response.model = glmer(C1Eng ~ HasProfile + (1|Con1Subject) + (1|TWTID_Rnd1), family=binomial, data)
+#  
+# summary(response.model)
+# ```
+
+Q2: Condition 2
+# ```{r}
+# data = CleanRespones
+# 
+# response.model = glmer(C2Eng  ~ HasProfile + (1|Con2Subject) + (1|TWTID_Rnd2), family=binomial, data)
+# 
+# summary(response.model)
+# ```
+
+Q2: Condition 3
+# ```{r}
+# data = CleanRespones
+# 
+# response.model = glmer(C3Eng  ~ HasProfile + (1|C3AccSubject) + (1|TWTID_Rnd3) , family=binomial ,data)
+#  
+# summary(response.model)
+# ```
+
